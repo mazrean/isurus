@@ -16,6 +16,10 @@
       {
         "command": "isurus.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "isurus.generateResponse",
+        "title": "Generate Response"
       }
     ],
     "configuration": {
