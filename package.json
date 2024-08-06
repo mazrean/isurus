@@ -29,6 +29,11 @@
           "type": "string",
           "default": "",
           "description": "Gemini API Token."
+        },
+        "isurus.langchain.token": {
+          "type": "string",
+          "default": "",
+          "description": "Langchain API Token."
         }
       }
     }

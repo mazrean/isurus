@@ -11,12 +11,14 @@ export function activate(context: vscode.ExtensionContext) {
 
   const config = vscode.workspace.getConfiguration("isurus");
 
+  const langchainToken = config.get<string>("langchain.token");
+
   const geminiToken = config.get<string>("gemini.token");
   if (!geminiToken) {
     vscode.window.showErrorMessage("Gemini token is not set");
     return;
   }
-  let model: Model = new GeminiModel(geminiToken);
+  let model: Model = new GeminiModel(geminiToken, langchainToken);
 
   const helloWorldCmd = vscode.commands.registerCommand(
     "isurus.helloWorld",
