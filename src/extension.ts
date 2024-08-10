@@ -30,7 +30,7 @@ const generateResponseCmd = (config: vscode.WorkspaceConfiguration) => {
       return;
     }
 
-    const response = await langchain.generateResponse(input);
+    const response = await langchain.retrieveDocuments(input);
     vscode.window.showInformationMessage(response);
   };
 };

@@ -8,7 +8,7 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { formatDocumentsAsString } from "langchain/util/document";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { createRetriever } from "@/retrieval/retrieval";
-import { StringOutputParser } from "@langchain/core/dist/output_parsers";
+import { StringOutputParser } from "@langchain/core/output_parsers";
 
 export class Langchain {
   model: ChatGoogleGenerativeAI;
@@ -25,6 +25,10 @@ export class Langchain {
       modelName: "gemini-1.5-pro",
     });
     this.retriever = createRetriever(geminiToken);
+  }
+
+  async retrieveDocuments(input: string) {
+    return (await this.retriever).pipe(formatDocumentsAsString).invoke(input);
   }
 
   async generateResponse(input: string) {

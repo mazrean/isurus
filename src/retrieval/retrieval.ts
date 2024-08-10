@@ -51,9 +51,9 @@ class VSCodeWorkspaceLoader extends BaseDocumentLoader {
     for (const [ext, loader] of Object.entries(this.loaders)) {
       const files = await vscode.workspace.findFiles(`**/*${ext}`);
       for (const file of files) {
-        const loaderInstance = loader(file.fsPath);
-        const documents = await loaderInstance.load();
-        documents.push(...documents);
+        const loaderInstance = loader(file.path);
+        const docs = await loaderInstance.load();
+        documents.push(...docs);
       }
     }
 
