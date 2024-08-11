@@ -63,30 +63,9 @@ class VSCodeWorkspaceLoader extends BaseDocumentLoader {
 
 const loadDocuments = async () => {
   const loader = new VSCodeWorkspaceLoader({
-    ".go": (path) =>
-      new VSCodeLoader(
-        path,
-        RecursiveCharacterTextSplitter.fromLanguage("go", {
-          chunkSize: 32,
-          chunkOverlap: 0,
-        })
-      ),
-    ".html": (path) =>
-      new VSCodeLoader(
-        path,
-        RecursiveCharacterTextSplitter.fromLanguage("html", {
-          chunkSize: 175,
-          chunkOverlap: 20,
-        })
-      ),
-    ".md": (path) =>
-      new VSCodeLoader(
-        path,
-        RecursiveCharacterTextSplitter.fromLanguage("markdown", {
-          chunkSize: 500,
-          chunkOverlap: 0,
-        })
-      ),
+    ".go": (path) => new VSCodeLoader(path),
+    ".html": (path) => new VSCodeLoader(path),
+    ".md": (path) => new VSCodeLoader(path),
     ".cnf": (path) => new VSCodeLoader(path),
     ".conf": (path) => new VSCodeLoader(path),
   });

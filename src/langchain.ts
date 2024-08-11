@@ -27,10 +27,6 @@ export class Langchain {
     this.retriever = createRetriever(geminiToken);
   }
 
-  async retrieveDocuments(input: string) {
-    return (await this.retriever).pipe(formatDocumentsAsString).invoke(input);
-  }
-
   async generateResponse(input: string) {
     const prompt =
       PromptTemplate.fromTemplate(`Answer the question based only on the following context:
