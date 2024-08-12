@@ -2,14 +2,12 @@ import * as vscode from "vscode";
 import { BaseDocumentLoader } from "@langchain/core/document_loaders/base";
 import { LoadersMapping } from "langchain/document_loaders/fs/directory";
 import { TextLoader } from "langchain/document_loaders/fs/text";
-import {
-  RecursiveCharacterTextSplitter,
-  TextSplitter,
-} from "langchain/text_splitter";
+import { TextSplitter } from "langchain/text_splitter";
 import { Document } from "@langchain/core/documents";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import { BaseRetriever } from "@langchain/core/dist/retrievers";
+import { EmbeddingsInterface } from "@langchain/core/embeddings";
 
 class VSCodeLoader extends TextLoader {
   constructor(public path: string, public splitter?: TextSplitter) {
@@ -72,14 +70,8 @@ const loadDocuments = async () => {
   return await loader.load();
 };
 
-export const createRetriever = async (geminiToken: string) => {
+export const createRetriever = async (embedding: EmbeddingsInterface) => {
   const documents = await loadDocuments();
-  const vectorStore = MemoryVectorStore.fromDocuments(
-    documents,
-    new GoogleGenerativeAIEmbeddings({
-      apiKey: geminiToken,
-      model: "text-embedding-004",
-    })
-  );
-  return (await vectorStore).asRetriever() as BaseRetriever;
+  const vectorStore = MemoryVectorStore.fromDocuments(documents, embedding);
+  return (await vectorStore).asRetriever(2) as BaseRetriever;
 };

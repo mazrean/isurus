@@ -2,6 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import { Langchain } from "@/langchain";
+import { setBenchmarkUrl } from "@/externals/benchmark";
 
 const helloWorldCmd = () => {
   vscode.window.showInformationMessage("Hello World from Isurus!");
@@ -17,9 +18,31 @@ const generateResponseCmd = (config: vscode.WorkspaceConfiguration) => {
     };
   }
 
+  const openaiToken = config.get<string>("openai.token");
+  if (!openaiToken) {
+    return () => {
+      vscode.window.showErrorMessage(
+        "OpenAI API token is required.\nPlease set it and reload the window."
+      );
+    };
+  }
+
   const langchainToken = config.get<string>("langchain.token");
 
-  let langchain = new Langchain(geminiToken, langchainToken);
+  const benchmarkUrl = config.get<string>("benchmark.url");
+  if (benchmarkUrl) {
+    setBenchmarkUrl(benchmarkUrl);
+  }
+
+  const prometheusURL =
+    config.get<string>("prometheus.url") ?? "http://localhost:9090";
+
+  let langchain = new Langchain({
+    geminiToken,
+    openaiToken,
+    prometheusURL,
+    langchainToken,
+  });
 
   return async () => {
     const input = await vscode.window.showInputBox({
