@@ -10,9 +10,9 @@ import {
 } from "@langchain/google-genai";
 import { formatDocumentsAsString } from "langchain/util/document";
 import { PromptTemplate } from "@langchain/core/prompts";
-import { createRetriever } from "@/retrieval/retrieval";
+import { createRetriever } from "@/langchain/retrieval/retrieval";
 import { StringOutputParser } from "@langchain/core/output_parsers";
-import { createTools } from "@/agent/tools";
+import { createTools } from "@/langchain/agent/tools";
 import { StructuredToolInterface } from "@langchain/core/tools";
 
 type Tools = StructuredToolInterface[];
