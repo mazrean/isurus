@@ -24,6 +24,36 @@ type Results<T> = {
 export class Prometheus {
   constructor(private url: string) {}
 
+  async queryMaxCPUUsage() {
+    const data = await this.queryRange(
+      'sum by (name) (irate(process_cpu_seconds_total{instance="isu1", job="nodes"}[5m]))'
+    );
+    if (data.resultType !== "matrix") {
+      throw new Error(`Unexpected result type: ${data.resultType}`);
+    }
+
+    const maxValueMap = new Map<string, number>();
+    for (const result of data.result) {
+      const name = result.metric.name;
+      const value = result.values;
+      if (!name || !value) {
+        continue;
+      }
+
+      const numberValue = value
+        .map((v) => Number(v[1]))
+        .filter((v) => !isNaN(v));
+      if (numberValue.length === 0) {
+        continue;
+      }
+
+      const max = Math.max(...numberValue);
+      maxValueMap.set(name, max);
+    }
+
+    return maxValueMap;
+  }
+
   async queryRange(query: string) {
     const benchmark = await getLatestBenchmark();
     const queryParam = new URLSearchParams({
@@ -52,8 +82,8 @@ export class Prometheus {
     const data = (await res.json()) as Response<
       Results<
         Partial<{
-          value: [number, string];
-          histogram: [number, Histogram];
+          values: [number, string][];
+          histograms: [number, Histogram][];
         }>
       >
     >;
