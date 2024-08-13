@@ -3,13 +3,14 @@
 import * as vscode from "vscode";
 import { Langchain } from "@/langchain/langchain";
 import { setBenchmarkUrl } from "@/externals/benchmark";
+import { config } from "@/config";
 
 const helloWorldCmd = () => {
   vscode.window.showInformationMessage("Hello World from Isurus!");
 };
 
-const generateResponseCmd = (config: vscode.WorkspaceConfiguration) => {
-  const geminiToken = config.get<string>("gemini.token");
+const generateResponseCmd = () => {
+  const geminiToken = config("isurus.gemini.token");
   if (!geminiToken) {
     return () => {
       vscode.window.showErrorMessage(
@@ -18,7 +19,7 @@ const generateResponseCmd = (config: vscode.WorkspaceConfiguration) => {
     };
   }
 
-  const openaiToken = config.get<string>("openai.token");
+  const openaiToken = config("isurus.openai.token");
   if (!openaiToken) {
     return () => {
       vscode.window.showErrorMessage(
@@ -27,15 +28,14 @@ const generateResponseCmd = (config: vscode.WorkspaceConfiguration) => {
     };
   }
 
-  const langchainToken = config.get<string>("langchain.token");
+  const langchainToken = config("isurus.langchain.token");
 
-  const benchmarkUrl = config.get<string>("benchmark.url");
+  const benchmarkUrl = config("isurus.benchmark.url");
   if (benchmarkUrl) {
     setBenchmarkUrl(benchmarkUrl);
   }
 
-  const prometheusURL =
-    config.get<string>("prometheus.url") ?? "http://localhost:9090";
+  const prometheusURL = config("isurus.prometheus.url");
 
   let langchain = new Langchain({
     geminiToken,
@@ -61,13 +61,11 @@ const generateResponseCmd = (config: vscode.WorkspaceConfiguration) => {
 export function activate(context: vscode.ExtensionContext) {
   console.log('Congratulations, your extension "isurus" is now active!');
 
-  const config = vscode.workspace.getConfiguration("isurus");
-
   context.subscriptions.push(
     vscode.commands.registerCommand("isurus.helloWorld", helloWorldCmd),
     vscode.commands.registerCommand(
       "isurus.generateResponse",
-      generateResponseCmd(config)
+      generateResponseCmd()
     )
   );
 }
