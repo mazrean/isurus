@@ -27,5 +27,15 @@ export const config = {
     "type": "string",
     "default": "http://localhost:6061",
     "description": "Benchmark information URL."
+  },
+  "isurus.app.name": {
+    "type": "string",
+    "default": "app",
+    "description": "Application name."
+  },
+  "isurus.db.name": {
+    "type": "string",
+    "default": "mysqld",
+    "description": "Database name."
   }
 } as const;

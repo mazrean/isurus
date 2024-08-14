@@ -20,6 +20,9 @@ importers:
       langchain:
         specifier: ^0.2.14
         version: 0.2.14(@langchain/google-genai@0.0.24)(ignore@5.3.1)(openai@4.55.4(zod@3.23.8))
+      vscode-jsonrpc:
+        specifier: ^8.2.1
+        version: 8.2.1
       zod:
         specifier: ^3.23.8
         version: 3.23.8
@@ -2000,6 +2003,10 @@ packages:
   validate-npm-package-license@3.0.4:
     resolution: {integrity: sha512-DpKm2Ui/xN7/HQKCtpZxoRWBhZ9Z0kqtygG8XCgNQ8ZlDnxuQmWhj566j8fN4Cu3/JmbhsDo7fcAJq4s9h27Ew==}
 
+  vscode-jsonrpc@8.2.1:
+    resolution: {integrity: sha512-kdjOSJ2lLIn7r1rtrMbbNCHjyMPfRnowdKjBQ+mGq6NAW5QY2bEZC/khaC5OR8svbbjvLEaIXkOq45e2X9BIbQ==}
+    engines: {node: '>=14.0.0'}
+
   web-streams-polyfill@4.0.0-beta.3:
     resolution: {integrity: sha512-QW95TCTaHmsYfHDybGMwO5IJIM93I/6vTRk+daHTWFPhwh+C8Cg7j7XyKrwrj8Ib6vYXe0ocYNrmzY4xAAN6ug==}
     engines: {node: '>= 14'}
@@ -3959,6 +3966,8 @@ snapshots:
     dependencies:
       spdx-correct: 3.2.0
       spdx-expression-parse: 3.0.1
+
+  vscode-jsonrpc@8.2.1: {}
 
   web-streams-polyfill@4.0.0-beta.3: {}
 
