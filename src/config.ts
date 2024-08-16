@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { config as conf } from "@/config.gen";
+import { config as conf, commands } from "@/config.gen";
 
 type Config = typeof conf;
 type TypeMap = {
@@ -25,5 +25,16 @@ export const config = <T extends keyof Config>(key: T) => {
 
   return (
     vscode.workspace.getConfiguration().get<ConvertType<T>>(key) ?? defaultValue
+  );
+};
+
+type Command = (typeof commands)[number][`command`];
+export const registerCommand = (
+  context: vscode.ExtensionContext,
+  command: Command,
+  callback: (...args: any[]) => any
+) => {
+  context.subscriptions.push(
+    vscode.commands.registerCommand(command, callback)
   );
 };

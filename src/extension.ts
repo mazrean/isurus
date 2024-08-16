@@ -3,7 +3,7 @@
 import * as vscode from "vscode";
 import { Langchain } from "@/langchain/langchain";
 import { setBenchmarkUrl } from "@/externals/benchmark";
-import { config } from "@/config";
+import { config, registerCommand } from "@/config";
 
 const helloWorldCmd = () => {
   vscode.window.showInformationMessage("Hello World from Isurus!");
@@ -61,13 +61,8 @@ const generateResponseCmd = () => {
 export function activate(context: vscode.ExtensionContext) {
   console.log('Congratulations, your extension "isurus" is now active!');
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand("isurus.helloWorld", helloWorldCmd),
-    vscode.commands.registerCommand(
-      "isurus.generateResponse",
-      generateResponseCmd()
-    )
-  );
+  registerCommand(context, "isurus.helloWorld", helloWorldCmd);
+  registerCommand(context, "isurus.generateResponse", generateResponseCmd());
 }
 
 export function deactivate() {}

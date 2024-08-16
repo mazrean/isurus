@@ -39,3 +39,14 @@ export const config = {
     "description": "Database name."
   }
 } as const;
+
+export const commands = [
+  {
+    "command": "isurus.helloWorld",
+    "title": "Hello World"
+  },
+  {
+    "command": "isurus.generateResponse",
+    "title": "Generate Response"
+  }
+] as const;
