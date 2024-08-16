@@ -3,6 +3,11 @@
 */
 
 export const config = {
+  "isurus.server.path": {
+    "type": "string",
+    "default": "isurus-server",
+    "description": "Server command path."
+  },
   "isurus.gemini.token": {
     "type": "string",
     "default": "",
