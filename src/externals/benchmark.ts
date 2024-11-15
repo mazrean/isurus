@@ -1,4 +1,4 @@
-let url = "https://localhost:6061/benchmark/latest";
+let url = "http://localhost:6061/benchmark/latest";
 
 export const setBenchmarkUrl = (newUrl: string) => {
   url = newUrl;

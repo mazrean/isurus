@@ -6,6 +6,7 @@ import { setBenchmarkUrl } from "@/externals/benchmark";
 import { config, registerCommand } from "@/config";
 import { goServer, startGoServer } from "./externals/go-server";
 import path from "path";
+import { analyzeCPUCmd } from "./analyzeCPU";
 
 const helloWorldCmd = () => {
   vscode.window.showInformationMessage("Hello World from Isurus!");
@@ -80,6 +81,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   registerCommand(context, "isurus.helloWorld", helloWorldCmd);
   registerCommand(context, "isurus.generateResponse", generateResponseCmd());
+  registerCommand(context, "isurus.analyzeCPU", analyzeCPUCmd);
 }
 
 export function deactivate() {}

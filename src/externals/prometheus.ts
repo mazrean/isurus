@@ -26,7 +26,7 @@ export class Prometheus {
 
   async queryMaxCPUUsage() {
     const data = await this.queryRange(
-      'sum by (name) (irate(process_cpu_seconds_total{instance="isu1", job="nodes"}[5m]))'
+      'sum by (name) (irate(process_cpu_seconds_total{job="nodes"}[4s]))'
     );
     if (data.resultType !== "matrix") {
       throw new Error(`Unexpected result type: ${data.resultType}`);
@@ -49,6 +49,99 @@ export class Prometheus {
 
       const max = Math.max(...numberValue);
       maxValueMap.set(name, max);
+    }
+
+    return maxValueMap;
+  }
+
+  async querySQLDuration() {
+    const data = await this.queryRange(
+      'sum by (driver, query)(increase(isutools_db_query_duration_seconds_sum{job="app"}[4s]))'
+    );
+    if (data.resultType !== "matrix") {
+      throw new Error(`Unexpected result type: ${data.resultType}`);
+    }
+
+    const maxValueMap = new Map<string, number>();
+    for (const result of data.result) {
+      const driver = result.metric.driver;
+      const query = result.metric.query;
+      const value = result.values;
+      if (!driver || !query || !value) {
+        continue;
+      }
+
+      const numberValue = value
+        .map((v) => Number(v[1]))
+        .filter((v) => !isNaN(v));
+      if (numberValue.length === 0) {
+        continue;
+      }
+
+      const max = Math.max(...numberValue);
+      maxValueMap.set(`${driver}:${query}`, max);
+    }
+
+    return maxValueMap;
+  }
+
+  async querySQLExecutionCount() {
+    const data = await this.queryRange(
+      'sum by (driver, query)(increase(isutools_db_query_count{job="app"}[5s]))'
+    );
+    if (data.resultType !== "matrix") {
+      throw new Error(`Unexpected result type: ${data.resultType}`);
+    }
+
+    const maxValueMap = new Map<string, number>();
+    for (const result of data.result) {
+      const driver = result.metric.driver;
+      const query = result.metric.query;
+      const value = result.values;
+      if (!driver || !query || !value) {
+        continue;
+      }
+
+      const numberValue = value
+        .map((v) => Number(v[1]))
+        .filter((v) => !isNaN(v));
+      if (numberValue.length === 0) {
+        continue;
+      }
+
+      const max = Math.max(...numberValue);
+      maxValueMap.set(`${driver}:${query}`, max);
+    }
+
+    return maxValueMap;
+  }
+
+  async querySQLLatency() {
+    const data = await this.queryRange(
+      'sum by (driver, query)(rate(isutools_db_query_duration_seconds_sum{job="app"}[4s])) / sum by (driver, query)(rate(isutools_db_query_duration_seconds_count{job="app"}[4s]))'
+    );
+    if (data.resultType !== "matrix") {
+      throw new Error(`Unexpected result type: ${data.resultType}`);
+    }
+
+    const maxValueMap = new Map<string, number>();
+    for (const result of data.result) {
+      const driver = result.metric.driver;
+      const query = result.metric.query;
+      const value = result.values;
+      if (!driver || !query || !value) {
+        continue;
+      }
+
+      const numberValue = value
+        .map((v) => Number(v[1]))
+        .filter((v) => !isNaN(v));
+      if (numberValue.length === 0) {
+        continue;
+      }
+
+      const max = Math.max(...numberValue);
+      maxValueMap.set(`${driver}:${query}`, max);
     }
 
     return maxValueMap;

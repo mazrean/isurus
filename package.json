@@ -20,6 +20,10 @@
       {
         "command": "isurus.generateResponse",
         "title": "Generate Response"
+      },
+      {
+        "command": "isurus.analyzeCPU",
+        "title": "Analyze CPU"
       }
     ],
     "configuration": {
@@ -52,7 +56,7 @@
         },
         "isurus.benchmark.url": {
           "type": "string",
-          "default": "http://localhost:6061",
+          "default": "http://localhost:6061/benchmark/latest",
           "description": "Benchmark information URL."
         },
         "isurus.app.name": {

@@ -53,5 +53,9 @@ export const commands = [
   {
     "command": "isurus.generateResponse",
     "title": "Generate Response"
+  },
+  {
+    "command": "isurus.analyzeCPU",
+    "title": "Analyze CPU"
   }
 ] as const;
