@@ -30,7 +30,7 @@ export const config = {
   },
   "isurus.benchmark.url": {
     "type": "string",
-    "default": "http://localhost:6061",
+    "default": "http://localhost:6061/benchmark/latest",
     "description": "Benchmark information URL."
   },
   "isurus.app.name": {

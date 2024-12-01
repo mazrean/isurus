@@ -64,18 +64,32 @@ const generateResponseCmd = () => {
 export async function activate(context: vscode.ExtensionContext) {
   console.log('Congratulations, your extension "isurus" is now active!');
 
+  const files = await vscode.workspace.findFiles("**/go.mod");
+  if (files.length === 0) {
+    vscode.window.showErrorMessage(
+      "Go module not found in the workspace. Go server may not work properly."
+    );
+    return;
+  }
+
+  const dir = path.dirname(files[0].path);
+
   // Start Go server
-  await startGoServer(config("isurus.server.path")).then(async () => {
-    const files = await vscode.workspace.findFiles("**/go.mod");
-    if (files.length === 0) {
+  await startGoServer(config("isurus.server.path"), dir).then(async () => {
+    const goFiles = await vscode.workspace.findFiles("**/*.go");
+    if (goFiles.length === 0) {
       vscode.window.showErrorMessage(
-        "Go module not found in the workspace. Go server may not work properly."
+        "Go files not found in the workspace. Go server may not work properly."
       );
       return;
     }
+    await Promise.all(
+      goFiles.map(async (file) => {
+        const content = (await vscode.workspace.fs.readFile(file)).toString();
+        await goServer?.addFile(file.path, content);
+      })
+    );
 
-    const dir = path.dirname(files[0].path);
-    goServer?.initialize(dir);
     console.log("Go server started");
   });
 
