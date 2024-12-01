@@ -1,25 +1,30 @@
 import * as cp from "child_process";
 import * as rpc from "vscode-jsonrpc/node";
 
-export type Position = {
-  file: string;
+type Position = {
   line: number;
   column: number;
+};
+
+export type Range = {
+  file: string;
+  start: Position;
+  end: Position;
 };
 
 export type CRUDResponse = {
   functions: {
     id: string;
-    position: Position;
+    position: Range;
     name: string;
     calls: {
       functionId: string;
-      position: Position;
+      position: Range;
       inLoop: boolean;
     }[];
     queries: {
       tableId: string;
-      position: Position;
+      position: Range;
       type: "select" | "insert" | "update" | "delete" | "unknown";
       raw: string;
       inLoop: boolean;
@@ -43,7 +48,9 @@ export class GoServer {
       new rpc.StreamMessageWriter(childProcess.stdin)
     );
     childProcess.stderr.on("data", (data) => {
-      console.debug(data.toString());
+      for (const line of data.toString().split("\n")) {
+        console.debug(line);
+      }
     });
 
     this.connection.onError((error) => {

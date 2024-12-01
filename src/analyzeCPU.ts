@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { config } from "@/config";
 import { Prometheus } from "@/externals/prometheus";
-import { goServer, GoServer, Position } from "@/externals/go-server";
+import { goServer, GoServer, Range } from "@/externals/go-server";
 import { addDiagnostic } from "@/diagnostics";
 
 const cpuUsageLimit = 0.5;
@@ -54,7 +54,7 @@ const summarizeCRUDGraph = async (goServer: GoServer) => {
     const queryMap = new Map<
       string,
       {
-        position: Position;
+        position: Range;
         type: "select" | "insert" | "update" | "delete" | "unknown";
         inLoop: boolean;
         tableIds: string[];
@@ -106,30 +106,14 @@ const summarizeCRUDGraph = async (goServer: GoServer) => {
 interface SQLFixPlan {
   plan: "index" | "join" | "cache";
   targetFunction: {
-    position: {
-      file: string;
-      line: number;
-      column: number;
-    };
+    position: Range;
     name: string;
-    queryPosition: {
-      file: string;
-      line: number;
-      column: number;
-    }[];
+    queryPosition: Range[];
   };
   relatedFunctions: {
-    position: {
-      file: string;
-      line: number;
-      column: number;
-    };
+    position: Range;
     name: string;
-    queryPositions: {
-      file: string;
-      line: number;
-      column: number;
-    }[];
+    queryPositions: Range[];
   }[];
 }
 
@@ -137,13 +121,13 @@ const planSQLFix = async (
   crudSummary: {
     tableCacheAvailabilityMap: Map<string, boolean>;
     queries: {
-      position: Position;
+      position: Range;
       type: "select" | "insert" | "update" | "delete" | "unknown";
       inLoop: boolean;
       raw: string;
       function: {
         id: string;
-        position: Position;
+        position: Range;
         name: string;
       };
       tableIds: string[];
@@ -203,6 +187,13 @@ const planSQLFix = async (
   }
 
   return;
+};
+
+const goPositionToVSCodePosition = (position: Range) => {
+  return new vscode.Range(
+    new vscode.Position(position.start.line - 1, position.start.column - 1),
+    new vscode.Position(position.end.line - 1, position.end.column - 1)
+  );
 };
 
 export const analyzeCPUCmd = async () => {
@@ -279,11 +270,7 @@ export const analyzeCPUCmd = async () => {
               for (const queryPosition of plan.targetFunction.queryPosition) {
                 addDiagnostic(
                   plan.targetFunction.position.file,
-                  queryPosition,
-                  {
-                    line: queryPosition.line,
-                    column: queryPosition.column + 1,
-                  },
+                  goPositionToVSCodePosition(queryPosition),
                   `SQL ${result.sql} is cacheable. Please cache the table.`,
                   vscode.DiagnosticSeverity.Warning
                 );
