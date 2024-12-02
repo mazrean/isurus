@@ -12,6 +12,19 @@ export type Range = {
   end: Position;
 };
 
+export type Query = {
+  tableId: string;
+  position: Range;
+  type: "select" | "insert" | "update" | "delete" | "unknown";
+  raw: string;
+  inLoop: boolean;
+};
+
+export type Table = {
+  id: string;
+  name: string;
+};
+
 export type CRUDResponse = {
   functions: {
     id: string;
@@ -22,18 +35,9 @@ export type CRUDResponse = {
       position: Range;
       inLoop: boolean;
     }[];
-    queries: {
-      tableId: string;
-      position: Range;
-      type: "select" | "insert" | "update" | "delete" | "unknown";
-      raw: string;
-      inLoop: boolean;
-    }[];
+    queries: Query[];
   }[];
-  tables: {
-    id: string;
-    name: string;
-  }[];
+  tables: Table[];
 };
 
 export class GoServer {

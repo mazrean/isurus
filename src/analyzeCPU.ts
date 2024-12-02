@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { config } from "@/config";
 import { Prometheus } from "@/externals/prometheus";
 import { goServer, GoServer, Range } from "@/externals/go-server";
-import { addDiagnostic } from "@/diagnostics";
+import { addDiagnostic, updateDiagnostics } from "@/diagnostics";
 
 const cpuUsageLimit = 0.5;
 const sqlCheckLimit = 5;
@@ -104,11 +104,11 @@ const summarizeCRUDGraph = async (goServer: GoServer) => {
 };
 
 interface SQLFixPlan {
-  plan: "index" | "join" | "cache";
+  plan: "index" | "join" | "cache" | "unknown";
   targetFunction: {
     position: Range;
     name: string;
-    queryPosition: Range[];
+    queryPositions: Range[];
   };
   relatedFunctions: {
     position: Range;
@@ -116,6 +116,20 @@ interface SQLFixPlan {
     queryPositions: Range[];
   }[];
 }
+
+const getDiagnotsticsPositions = (plan: SQLFixPlan) => {
+  return [
+    ...plan.targetFunction.queryPositions,
+    ...plan.relatedFunctions.flatMap((f) => f.queryPositions),
+  ];
+};
+
+const getPromptPositions = (plan: SQLFixPlan) => {
+  return [
+    plan.targetFunction.position,
+    ...plan.relatedFunctions.map((f) => f.position),
+  ];
+};
 
 const planSQLFix = async (
   crudSummary: {
@@ -163,30 +177,40 @@ const planSQLFix = async (
     return query === crudQuery;
   });
 
+  const fixPlans: SQLFixPlan[] = [];
+
   if (!sql) {
-    return;
+    return fixPlans;
   }
 
   const isCacheable = sql.tableIds.every((id) =>
     crudSummary.tableCacheAvailabilityMap.get(id)
   );
   if (isCacheable) {
-    vscode.window.showInformationMessage(
-      `SQL ${sql.raw} is cacheable. Please cache the table.`
-    );
-
-    return {
+    fixPlans.push({
       plan: "cache",
       targetFunction: {
         position: sql.function.position,
         name: sql.function.name,
-        queryPosition: [sql.position],
+        queryPositions: [sql.position],
       },
       relatedFunctions: [],
-    } as SQLFixPlan;
+    });
   }
 
-  return;
+  if (fixPlans.length === 0) {
+    fixPlans.push({
+      plan: "unknown",
+      targetFunction: {
+        position: sql.function.position,
+        name: sql.function.name,
+        queryPositions: [sql.position],
+      },
+      relatedFunctions: [],
+    });
+  }
+
+  return fixPlans;
 };
 
 const goPositionToVSCodePosition = (position: Range) => {
@@ -247,35 +271,39 @@ export const analyzeCPUCmd = async () => {
         }
 
         for (const result of sqlAnalyzeResult) {
-          const plan = await planSQLFix(crudSummary, result);
-          if (!plan) {
+          const plans = await planSQLFix(crudSummary, result);
+          if (!plans) {
             vscode.window.showInformationMessage(
-              `SQL ${result.sql} is too slow. but isurus can't detect the issue.`
+              `SQL ${result.sql} is too slow. but isurus can't provide the fix plan.`
             );
             continue;
           }
 
-          switch (plan.plan) {
-            case "index":
-              vscode.window.showInformationMessage(
-                `SQL ${result.sql} is too slow. Please add index to the table.`
+          for (const plan of plans) {
+            let message = "";
+            switch (plan.plan) {
+              case "index":
+                message = `SQL ${result.sql} is too slow. Please add index.`;
+                break;
+              case "join":
+                message = `SQL ${result.sql} is too slow. Please join the table.`;
+                break;
+              case "cache":
+                message = `SQL ${result.sql} is cacheable. Please cache the table.`;
+                break;
+              case "unknown":
+                message = `SQL ${result.sql} is too slow.`;
+                break;
+            }
+
+            for (const planPosition of getDiagnotsticsPositions(plan)) {
+              addDiagnostic(
+                planPosition.file,
+                goPositionToVSCodePosition(planPosition),
+                message,
+                vscode.DiagnosticSeverity.Warning
               );
-              break;
-            case "join":
-              vscode.window.showInformationMessage(
-                `SQL ${result.sql} is too slow. Please optimize the query.`
-              );
-              break;
-            case "cache":
-              for (const queryPosition of plan.targetFunction.queryPosition) {
-                addDiagnostic(
-                  plan.targetFunction.position.file,
-                  goPositionToVSCodePosition(queryPosition),
-                  `SQL ${result.sql} is cacheable. Please cache the table.`,
-                  vscode.DiagnosticSeverity.Warning
-                );
-              }
-              break;
+            }
           }
         }
 
@@ -294,4 +322,6 @@ export const analyzeCPUCmd = async () => {
         break;
     }
   }
+
+  updateDiagnostics();
 };

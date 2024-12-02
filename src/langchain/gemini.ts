@@ -3,7 +3,6 @@ import {
   RunnablePassthrough,
   RunnableSequence,
 } from "@langchain/core/runnables";
-import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import {
   ChatGoogleGenerativeAI,
   GoogleGenerativeAIEmbeddings,
@@ -19,14 +18,12 @@ type Tools = StructuredToolInterface[];
 
 export type LangchainConfig = {
   geminiToken: string;
-  openaiToken: string;
   prometheusURL: string;
   langchainToken?: string;
 };
 
 export class Langchain {
-  //geminiModel: ChatGoogleGenerativeAI;
-  openaiModel: ChatOpenAI;
+  geminiModel: ChatGoogleGenerativeAI;
   retriever: Promise<BaseRetriever>;
   tools: Promise<Tools>;
 
@@ -36,22 +33,13 @@ export class Langchain {
       process.env.LANGCHAIN_API_KEY = config.langchainToken;
     }
 
-    /*this.geminiModel = new ChatGoogleGenerativeAI({
+    this.geminiModel = new ChatGoogleGenerativeAI({
       apiKey: config.geminiToken,
       modelName: "gemini-1.5-pro",
     });
     const embedder = new GoogleGenerativeAIEmbeddings({
       apiKey: config.geminiToken,
       model: "text-embedding-004",
-    });*/
-    this.openaiModel = new ChatOpenAI({
-      apiKey: config.openaiToken,
-      model: "gpt-4o-mini",
-      temperature: 0.9,
-    });
-    const embedder = new OpenAIEmbeddings({
-      apiKey: config.openaiToken,
-      model: "text-embedding-3-large",
     });
     this.retriever = createRetriever(embedder);
     this.tools = createTools(config.prometheusURL);
@@ -73,7 +61,7 @@ Question: {question}`);
         question: new RunnablePassthrough(),
       },
       prompt,
-      this.openaiModel.bindTools(await this.tools),
+      this.geminiModel.bindTools(await this.tools),
       new StringOutputParser(),
     ]);
     const response = await chain.invoke(input);

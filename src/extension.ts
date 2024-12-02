@@ -1,7 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
-import { Langchain } from "@/langchain/langchain";
+import { Langchain } from "@/langchain/openai";
 import { setBenchmarkUrl } from "@/externals/benchmark";
 import { config, registerCommand } from "@/config";
 import { goServer, startGoServer } from "./externals/go-server";
@@ -41,7 +41,6 @@ const generateResponseCmd = () => {
   const prometheusURL = config("isurus.prometheus.url");
 
   let langchain = new Langchain({
-    geminiToken,
     openaiToken,
     prometheusURL,
     langchainToken,
