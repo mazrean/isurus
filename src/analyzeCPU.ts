@@ -161,7 +161,8 @@ type SQLFixPlanFunction = {
 };
 
 interface SQLFixPlan {
-  plan: "index" | "join" | "bulk insert" | "cache" | "unknown";
+  plan: "index" | "join" | "bulk" | "cache" | "unknown";
+  queryType: "select" | "insert" | "update" | "delete" | "unknown";
   targetFunction: SQLFixPlanFunction;
   relatedFunctions: SQLFixPlanFunction[];
 }
@@ -218,6 +219,7 @@ const planSQLFix = async (
     if (shouldCache) {
       fixPlans.push({
         plan: "cache",
+        queryType: sql.type,
         targetFunction: {
           ...sql.execution.executor,
           queryPositions: [sql.execution.position],
@@ -267,7 +269,8 @@ const planSQLFix = async (
       );
 
       fixPlans.push({
-        plan: sql.type === "insert" ? "bulk insert" : "join",
+        plan: sql.type === "select" ? "join" : "bulk",
+        queryType: sql.type,
         targetFunction: callStack[0],
         relatedFunctions: callStack.slice(1),
       });
@@ -276,6 +279,7 @@ const planSQLFix = async (
     if (fixPlans.length === 0) {
       fixPlans.push({
         plan: "unknown",
+        queryType: sql.type,
         targetFunction: {
           ...sql.execution.executor,
           queryPositions: [sql.execution.position],
@@ -363,8 +367,8 @@ export const analyzeCPUCmd = async () => {
               case "join":
                 message = `SQL ${result.query} is too slow. Please join the table.`;
                 break;
-              case "bulk insert":
-                message = `SQL ${result.query} is too slow. Please bulk insert the table.`;
+              case "bulk":
+                message = `SQL ${result.query} is too slow. Please ${plan.queryType} in bulk.`;
                 break;
               case "cache":
                 message = `SQL ${result.query} is cacheable. Please cache the query result.`;
