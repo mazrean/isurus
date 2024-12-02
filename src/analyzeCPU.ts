@@ -8,7 +8,8 @@ const cpuUsageLimit = 0.5;
 const sqlCheckLimit = 5;
 
 interface SQLAnalyzeResult {
-  sql: string;
+  driver: string;
+  query: string;
   duration: number;
   latency: number;
   executionCount: number;
@@ -37,7 +38,10 @@ const analyzeDB = async (prometheus: Prometheus) => {
       continue;
     }
 
-    results.push({ sql, duration, latency, executionCount });
+    let [driver, query] = sql.toLowerCase().split(/(?<=^[^:]+?):/);
+    query = query.trimStart().replace(/\s+/g, " ");
+
+    results.push({ driver, query, duration, latency, executionCount });
   }
 
   return results;
@@ -157,7 +161,7 @@ type SQLFixPlanFunction = {
 };
 
 interface SQLFixPlan {
-  plan: "index" | "join" | "cache" | "unknown";
+  plan: "index" | "join" | "bulk insert" | "cache" | "unknown";
   targetFunction: SQLFixPlanFunction;
   relatedFunctions: SQLFixPlanFunction[];
 }
@@ -173,27 +177,15 @@ const getDiagnotsticsPositions = (plan: SQLFixPlan) => {
   ];
 };
 
-const getPromptPositions = (plan: SQLFixPlan) => {
-  return [
-    plan.targetFunction.position,
-    ...plan.relatedFunctions.map((f) => f.position),
-  ];
-};
-
 const planSQLFix = async (
   crudSummary: CRUDGraphSummary,
   sqlAnalyzeResult: SQLAnalyzeResult
 ) => {
-  let [driver, query] = sqlAnalyzeResult.sql
-    .toLowerCase()
-    .split(/(?<=^[^:]+?):/);
-  query = query.trimStart().replace(/\s+/g, " ");
-
   const sqlList = [...crudSummary.values()]
     .flatMap(({ queries }) => queries)
     .filter((q) => {
       let crudQuery = q.raw.toLowerCase();
-      switch (driver) {
+      switch (sqlAnalyzeResult.driver) {
         case "postgres":
           crudQuery = crudQuery.replace(/(\$(\d*)\s*,\s*)+\$(\d*)/, "..., ?");
           crudQuery = crudQuery.replace(/(\(..., \?\)\s*,\s*)+/, "..., ");
@@ -210,7 +202,7 @@ const planSQLFix = async (
           crudQuery = crudQuery.replace(/(\(\.\.\., \?\)\s*,\s*)+/, "..., ");
           break;
       }
-      return query === crudQuery;
+      return sqlAnalyzeResult.query === crudQuery;
     });
 
   const fixPlans: SQLFixPlan[] = [];
@@ -275,7 +267,7 @@ const planSQLFix = async (
       );
 
       fixPlans.push({
-        plan: "join",
+        plan: sql.type === "insert" ? "bulk insert" : "join",
         targetFunction: callStack[0],
         relatedFunctions: callStack.slice(1),
       });
@@ -357,7 +349,7 @@ export const analyzeCPUCmd = async () => {
           const plans = await planSQLFix(crudSummary, result);
           if (!plans) {
             vscode.window.showInformationMessage(
-              `SQL ${result.sql} is too slow. but isurus can't provide the fix plan.`
+              `SQL ${result.query} is too slow. but isurus can't provide the fix plan.`
             );
             continue;
           }
@@ -366,16 +358,19 @@ export const analyzeCPUCmd = async () => {
             let message = "";
             switch (plan.plan) {
               case "index":
-                message = `SQL ${result.sql} is too slow. Please add index.`;
+                message = `SQL ${result.query} is too slow. Please add index.`;
                 break;
               case "join":
-                message = `SQL ${result.sql} is too slow. Please join the table.`;
+                message = `SQL ${result.query} is too slow. Please join the table.`;
+                break;
+              case "bulk insert":
+                message = `SQL ${result.query} is too slow. Please bulk insert the table.`;
                 break;
               case "cache":
-                message = `SQL ${result.sql} is cacheable. Please cache the table.`;
+                message = `SQL ${result.query} is cacheable. Please cache the query result.`;
                 break;
               case "unknown":
-                message = `SQL ${result.sql} is too slow.`;
+                message = `SQL ${result.query} is too slow.`;
                 break;
             }
 
