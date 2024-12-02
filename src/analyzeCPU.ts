@@ -43,84 +43,133 @@ const analyzeDB = async (prometheus: Prometheus) => {
   return results;
 };
 
-const summarizeCRUDGraph = async (goServer: GoServer) => {
+type SummaryFunction = {
+  id: string;
+  position: Range;
+  name: string;
+  namePosition: Range;
+  callers: {
+    position: Range;
+    inLoop: boolean;
+    callee: SummaryFunction;
+  }[];
+};
+
+type CRUDGraphSummary = Map<
+  string,
+  {
+    name: string;
+    queries: {
+      type: "select" | "insert" | "update" | "delete" | "unknown";
+      raw: string;
+      tableIds: string[];
+      execution: {
+        executor: SummaryFunction;
+        position: Range;
+        inLoop: boolean;
+      };
+      metrics: {
+        duration: number;
+        latency: number;
+        executionCount: number;
+      };
+    }[];
+  }
+>;
+
+const createCRUDSummary = async (goServer: GoServer) => {
   const crud = await goServer.crud();
 
-  const tableCacheAvailabilityMap = new Map(
-    crud.tables.map((t) => [t.id, true])
+  const functionMap = new Map(
+    crud.functions.map((func) => [
+      func.id,
+      {
+        id: func.id,
+        position: func.position,
+        name: func.name,
+        namePosition: func.namePosition,
+        callers: [],
+      } as SummaryFunction,
+    ])
   );
 
-  const queries = crud.functions.flatMap((f) => {
-    const queryMap = new Map<
-      string,
-      {
-        position: Range;
-        type: "select" | "insert" | "update" | "delete" | "unknown";
-        inLoop: boolean;
-        tableIds: string[];
+  for (const func of crud.functions) {
+    const currentFunc = functionMap.get(func.id)!;
+    for (const call of func.calls) {
+      const calledFunc = functionMap.get(call.functionId);
+      if (!calledFunc) {
+        continue;
       }
-    >();
-    for (const q of f.queries) {
-      if (!queryMap.has(q.raw)) {
-        queryMap.set(q.raw, {
-          position: q.position,
-          type: q.type,
-          inLoop: q.inLoop,
-          tableIds: [],
-        });
-      }
-      queryMap.get(q.raw)?.tableIds.push(q.tableId);
-    }
 
-    return Array.from(queryMap).map(([raw, query]) => ({
-      ...query,
-      raw,
-      function: f,
-    }));
-  });
-  for (const query of queries) {
-    if (query.type !== "select" && query.type !== "insert") {
-      for (const tableId of query.tableIds) {
-        tableCacheAvailabilityMap.set(tableId, false);
-      }
+      calledFunc.callers.push({
+        position: call.position,
+        inLoop: call.inLoop,
+        callee: currentFunc,
+      });
     }
   }
 
-  const functionCallerMap = new Map<string, string[]>();
-  for (const f of crud.functions) {
-    for (const call of f.calls) {
-      if (!functionCallerMap.has(call.functionId)) {
-        functionCallerMap.set(call.functionId, []);
+  const tableMap = new Map(crud.tables.map((table) => [table.id, table.name]));
+
+  const crudGraphSummary: CRUDGraphSummary = new Map();
+  for (const func of crud.functions) {
+    const executor = functionMap.get(func.id)!;
+
+    for (const query of func.queries) {
+      const crudItem = {
+        type: query.type,
+        raw: query.raw,
+        tableIds: [query.tableId],
+        execution: {
+          executor,
+          position: query.position,
+          inLoop: query.inLoop,
+        },
+        metrics: {
+          duration: 0,
+          latency: 0,
+          executionCount: 0,
+        },
+      };
+
+      const key = query.tableId;
+      let table = crudGraphSummary.get(key);
+      if (!table) {
+        table = {
+          name: tableMap.get(key) ?? "unknown",
+          queries: [],
+        };
       }
-      functionCallerMap.get(call.functionId)?.push(f.id);
+
+      table.queries.push(crudItem);
+      crudGraphSummary.set(key, table);
     }
   }
 
-  return {
-    tableCacheAvailabilityMap,
-    queries,
-    functionCallerMap,
-  };
+  return crudGraphSummary;
+};
+
+type SQLFixPlanFunction = {
+  position: Range;
+  name: string;
+  namePosition: Range;
+  queryPositions: Range[];
 };
 
 interface SQLFixPlan {
   plan: "index" | "join" | "cache" | "unknown";
-  targetFunction: {
-    position: Range;
-    name: string;
-    queryPositions: Range[];
-  };
-  relatedFunctions: {
-    position: Range;
-    name: string;
-    queryPositions: Range[];
-  }[];
+  targetFunction: SQLFixPlanFunction;
+  relatedFunctions: SQLFixPlanFunction[];
 }
 
 const getDiagnotsticsPositions = (plan: SQLFixPlan) => {
   return [
+    plan.targetFunction.namePosition,
     ...plan.targetFunction.queryPositions,
-    ...plan.relatedFunctions.flatMap((f) => f.queryPositions),
+    ...plan.relatedFunctions.flatMap((f) => [
+      f.namePosition,
+      ...f.queryPositions,
+    ]),
   ];
 };
 
@@ -132,22 +181,7 @@ const getPromptPositions = (plan: SQLFixPlan) => {
 };
 
 const planSQLFix = async (
-  crudSummary: {
-    tableCacheAvailabilityMap: Map<string, boolean>;
-    queries: {
-      position: Range;
-      type: "select" | "insert" | "update" | "delete" | "unknown";
-      inLoop: boolean;
-      raw: string;
-      function: {
-        id: string;
-        position: Range;
-        name: string;
-      };
-      tableIds: string[];
-    }[];
-    functionCallerMap: Map<string, string[]>;
-  },
+  crudSummary: CRUDGraphSummary,
   sqlAnalyzeResult: SQLAnalyzeResult
 ) => {
   let [driver, query] = sqlAnalyzeResult.sql
@@ -155,59 +189,108 @@ const planSQLFix = async (
     .split(/(?<=^[^:]+?):/);
   query = query.trimStart().replace(/\s+/g, " ");
 
-  const sql = crudSummary.queries.find((q) => {
-    let crudQuery = q.raw.toLowerCase();
-    switch (driver) {
-      case "postgres":
-        crudQuery = crudQuery.replace(/(\$(\d*)\s*,\s*)+\$(\d*)/, "..., ?");
-        crudQuery = crudQuery.replace(/(\(..., \?\)\s*,\s*)+/, "..., ");
-        break;
-      case "mysql":
-        crudQuery = crudQuery.replace(/(\?\s*,\s*)+/, "..., ");
-        crudQuery = crudQuery.replace(/(\(\.\.\., \?\)\s*,\s*)+/, "..., ");
-        break;
-      case "sqlite":
-        crudQuery = crudQuery.replace(
-          /((?:\?(\d*)|[@:$][0-9A-Fa-f]+)\s*,\s*)+(?:\?(\d*)|[@:$][0-9A-Fa-f]+)/,
-          "..., ?"
-        );
-        crudQuery = crudQuery.replace(/(\(\.\.\., \?\)\s*,\s*)+/, "..., ");
-        break;
-    }
-    return query === crudQuery;
-  });
+  const sqlList = [...crudSummary.values()]
+    .flatMap(({ queries }) => queries)
+    .filter((q) => {
+      let crudQuery = q.raw.toLowerCase();
+      switch (driver) {
+        case "postgres":
+          crudQuery = crudQuery.replace(/(\$(\d*)\s*,\s*)+\$(\d*)/, "..., ?");
+          crudQuery = crudQuery.replace(/(\(..., \?\)\s*,\s*)+/, "..., ");
+          break;
+        case "mysql":
+          crudQuery = crudQuery.replace(/(\?\s*,\s*)+/, "..., ");
+          crudQuery = crudQuery.replace(/(\(\.\.\., \?\)\s*,\s*)+/, "..., ");
+          break;
+        case "sqlite":
+          crudQuery = crudQuery.replace(
+            /((?:\?(\d*)|[@:$][0-9A-Fa-f]+)\s*,\s*)+(?:\?(\d*)|[@:$][0-9A-Fa-f]+)/,
+            "..., ?"
+          );
+          crudQuery = crudQuery.replace(/(\(\.\.\., \?\)\s*,\s*)+/, "..., ");
+          break;
+      }
+      return query === crudQuery;
+    });
 
   const fixPlans: SQLFixPlan[] = [];
 
-  if (!sql) {
-    return fixPlans;
-  }
+  for (const sql of sqlList) {
+    const shouldCache =
+      sql.metrics.executionCount > 500 &&
+      sql.tableIds.every((id) =>
+        crudSummary
+          .get(id)
+          ?.queries.every((q) => q.type === "select" || q.type === "insert")
+      );
+    if (shouldCache) {
+      fixPlans.push({
+        plan: "cache",
+        targetFunction: {
+          ...sql.execution.executor,
+          queryPositions: [sql.execution.position],
+        },
+        relatedFunctions: [],
+      });
+    }
 
-  const isCacheable = sql.tableIds.every((id) =>
-    crudSummary.tableCacheAvailabilityMap.get(id)
-  );
-  if (isCacheable) {
-    fixPlans.push({
-      plan: "cache",
-      targetFunction: {
-        position: sql.function.position,
-        name: sql.function.name,
-        queryPositions: [sql.position],
-      },
-      relatedFunctions: [],
-    });
-  }
+    const inLoopCallStacksChecker = (
+      func: SummaryFunction,
+      callStack: SummaryFunction[]
+    ): SummaryFunction[][] => {
+      const newCallStack = [func, ...callStack];
 
-  if (fixPlans.length === 0) {
-    fixPlans.push({
-      plan: "unknown",
-      targetFunction: {
-        position: sql.function.position,
-        name: sql.function.name,
-        queryPositions: [sql.position],
-      },
-      relatedFunctions: [],
-    });
+      const inLoopCallStacks = [];
+      for (const call of func.callers) {
+        if (call.inLoop) {
+          inLoopCallStacks.push([call.callee, ...newCallStack]);
+          continue;
+        }
+
+        if (newCallStack.includes(call.callee)) {
+          continue;
+        }
+
+        const res = inLoopCallStacksChecker(call.callee, newCallStack);
+        inLoopCallStacks.push(...res);
+      }
+
+      return inLoopCallStacks;
+    };
+
+    const inLoopCallStacks: SummaryFunction[][] = [];
+    if (sql.execution.inLoop) {
+      inLoopCallStacks.push([sql.execution.executor]);
+    }
+    inLoopCallStacks.push(
+      ...inLoopCallStacksChecker(sql.execution.executor, [])
+    );
+    for (const inLoopCallStack of inLoopCallStacks) {
+      const callStack = inLoopCallStack.map((f) => ({
+        ...f,
+        queryPositions: [] as Range[],
+      }));
+      callStack[callStack.length - 1].queryPositions.push(
+        sql.execution.position
+      );
+
+      fixPlans.push({
+        plan: "join",
+        targetFunction: callStack[0],
+        relatedFunctions: callStack.slice(1),
+      });
+    }
+
+    if (fixPlans.length === 0) {
+      fixPlans.push({
+        plan: "unknown",
+        targetFunction: {
+          ...sql.execution.executor,
+          queryPositions: [sql.execution.position],
+        },
+        relatedFunctions: [],
+      });
+    }
   }
 
   return fixPlans;
@@ -261,7 +344,7 @@ export const analyzeCPUCmd = async () => {
 
         const [sqlAnalyzeResult, crudSummary] = await Promise.all([
           analyzeDB(prometheus),
-          summarizeCRUDGraph(goServer),
+          createCRUDSummary(goServer),
         ]);
         if (sqlAnalyzeResult.length === 0) {
           vscode.window.showInformationMessage(

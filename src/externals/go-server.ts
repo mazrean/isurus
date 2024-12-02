@@ -30,6 +30,7 @@ export type CRUDResponse = {
     id: string;
     position: Range;
     name: string;
+    namePosition: Range;
     calls: {
       functionId: string;
       position: Range;
