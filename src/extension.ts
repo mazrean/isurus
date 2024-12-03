@@ -2,7 +2,6 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import { Langchain } from "@/langchain/openai";
-import { setIsutoolsUrl } from "@/externals/isutools";
 import { config, registerCommand } from "@/config";
 import { goServer, startGoServer } from "./externals/go-server";
 import path from "path";
@@ -32,11 +31,6 @@ const generateResponseCmd = () => {
   }
 
   const langchainToken = config("isurus.langchain.token");
-
-  const isutoolsUrl = config("isurus.isutools.url");
-  if (isutoolsUrl) {
-    setIsutoolsUrl(isutoolsUrl);
-  }
 
   const prometheusURL = config("isurus.prometheus.url");
 

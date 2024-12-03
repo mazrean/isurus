@@ -1,3 +1,4 @@
+import { config } from "@/config";
 import { getLatestBenchmark } from "@/externals/isutools";
 
 type Histogram = {
@@ -248,3 +249,5 @@ export class Prometheus {
     return data.data;
   }
 }
+
+export const prometheus = new Prometheus(config("isurus.prometheus.url"));

@@ -1,8 +1,4 @@
-let url = "http://localhost:6061";
-
-export const setIsutoolsUrl = (newUrl: string) => {
-  url = newUrl;
-};
+import { config } from "@/config";
 
 export type Benchmark = {
   start: Date;
@@ -11,7 +7,7 @@ export type Benchmark = {
 };
 
 export const getLatestBenchmark = async () => {
-  const res = await fetch(`${url}/benchmark/latest`);
+  const res = await fetch(`${config("isurus.isutools.url")}/benchmark/latest`);
   if (!res.ok || res.status !== 200) {
     throw new Error(
       `Failed to fetch benchmark(${res.status}): ${await res.text()}`
@@ -40,7 +36,7 @@ export type QueryExplainResult = {
 };
 
 export const explainQuery = async (driver: string, query: string) => {
-  const queriesRes = await fetch(`${url}/queries`);
+  const queriesRes = await fetch(`${config("isurus.isutools.url")}/queries`);
   if (!queriesRes.ok || queriesRes.status !== 200) {
     console.info(
       `Failed to fetch queries(query: ${query}, status: ${
@@ -66,9 +62,11 @@ export const explainQuery = async (driver: string, query: string) => {
     return;
   }
 
-  const res = await fetch(`${url}/queries/${queryId}/explain`);
+  const res = await fetch(
+    `${config("isurus.isutools.url")}/queries/${queryId}/explain`
+  );
   if (!res.ok || res.status !== 200) {
-    console.info(
+    console.error(
       `Failed to explain query(query: ${query}, status: ${
         queriesRes.status
       }, id: ${queryId}): ${await res.text()}`
@@ -80,9 +78,11 @@ export const explainQuery = async (driver: string, query: string) => {
 };
 
 export const getTableCreateQuery = async (driver: string, table: string) => {
-  const res = await fetch(`${url}/tables?driver=${driver}`);
+  const res = await fetch(
+    `${config("isurus.isutools.url")}/tables?driver=${driver}`
+  );
   if (!res.ok || res.status !== 200) {
-    console.info(
+    console.error(
       `Failed to fetch table create query(table: ${table}, status: ${
         res.status
       }): ${await res.text()}`
