@@ -3,6 +3,12 @@ import { config } from "@/config";
 import { Prometheus } from "@/externals/prometheus";
 import { goServer, GoServer, Range } from "@/externals/go-server";
 import { addDiagnostic, updateDiagnostics } from "@/diagnostics";
+import {
+  explainQuery,
+  getTableCreateQuery,
+  QueryExplainResult,
+} from "@/externals/isutools";
+import { map } from "zod";
 
 const cpuUsageLimit = 0.5;
 const sqlCheckLimit = 5;
@@ -13,6 +19,7 @@ interface SQLAnalyzeResult {
   duration: number;
   latency: number;
   executionCount: number;
+  explainPromise: Promise<QueryExplainResult[] | undefined>;
 }
 
 const analyzeDB = async (prometheus: Prometheus) => {
@@ -41,7 +48,16 @@ const analyzeDB = async (prometheus: Prometheus) => {
     let [driver, query] = sql.toLowerCase().split(/(?<=^[^:]+?):/);
     query = query.trimStart().replace(/\s+/g, " ");
 
-    results.push({ driver, query, duration, latency, executionCount });
+    const explainPromise = explainQuery(driver, query);
+
+    results.push({
+      driver,
+      query,
+      duration,
+      latency,
+      executionCount,
+      explainPromise,
+    });
   }
 
   return results;
@@ -161,7 +177,35 @@ type SQLFixPlanFunction = {
 };
 
 interface SQLFixPlan {
-  plan: "index" | "join" | "bulk" | "cache" | "unknown";
+  plan:
+    | {
+        type: "index";
+        issues: {
+          table: {
+            name: string;
+            createQuery?: string;
+          };
+          key: string;
+          rows: number;
+          filtered: number;
+        }[];
+      }
+    | { type: "join" }
+    | { type: "bulk" }
+    | { type: "cache" }
+    | {
+        type: "unknown";
+        metrics: {
+          tables?: {
+            name: string;
+            createQuery?: string;
+            rows: number;
+          }[];
+          latency: number;
+          executionCount: number;
+        };
+      };
+  targetQuery: SQLAnalyzeResult;
   queryType: "select" | "insert" | "update" | "delete" | "unknown";
   targetFunction: SQLFixPlanFunction;
   relatedFunctions: SQLFixPlanFunction[];
@@ -208,6 +252,40 @@ const planSQLFix = async (
 
   const fixPlans: SQLFixPlan[] = [];
 
+  const explainResult = await sqlAnalyzeResult.explainPromise;
+  const indexIssues =
+    explainResult &&
+    (await Promise.all(
+      explainResult
+        .filter((result) => result.rows > 100 && result.filtered < 80)
+        .map(async (result) => ({
+          table: {
+            name: result.table,
+            createQuery: await getTableCreateQuery(
+              sqlAnalyzeResult.driver,
+              result.table
+            ),
+          },
+          key: result.key,
+          rows: result.rows,
+          filtered: result.filtered,
+        }))
+    ));
+  const tables =
+    explainResult &&
+    (await Promise.all(
+      explainResult
+        .filter((result) => result.rows > 100)
+        .map(async (result) => ({
+          name: result.table,
+          createQuery: await getTableCreateQuery(
+            sqlAnalyzeResult.driver,
+            result.table
+          ),
+          rows: result.rows,
+        }))
+    ));
+
   for (const sql of sqlList) {
     const shouldCache =
       sql.metrics.executionCount > 500 &&
@@ -218,8 +296,9 @@ const planSQLFix = async (
       );
     if (shouldCache) {
       fixPlans.push({
-        plan: "cache",
+        plan: { type: "cache" },
         queryType: sql.type,
+        targetQuery: sqlAnalyzeResult,
         targetFunction: {
           ...sql.execution.executor,
           queryPositions: [sql.execution.position],
@@ -269,17 +348,39 @@ const planSQLFix = async (
       );
 
       fixPlans.push({
-        plan: sql.type === "select" ? "join" : "bulk",
+        plan: sql.type === "select" ? { type: "join" } : { type: "bulk" },
         queryType: sql.type,
+        targetQuery: sqlAnalyzeResult,
         targetFunction: callStack[0],
         relatedFunctions: callStack.slice(1),
       });
     }
 
+    if (indexIssues && indexIssues.length > 0) {
+      fixPlans.push({
+        plan: { type: "index", issues: indexIssues },
+        queryType: sql.type,
+        targetQuery: sqlAnalyzeResult,
+        targetFunction: {
+          ...sql.execution.executor,
+          queryPositions: [sql.execution.position],
+        },
+        relatedFunctions: [],
+      });
+    }
+
     if (fixPlans.length === 0) {
       fixPlans.push({
-        plan: "unknown",
+        plan: {
+          type: "unknown",
+          metrics: {
+            tables,
+            latency: sql.metrics.latency,
+            executionCount: sql.metrics.executionCount,
+          },
+        },
         queryType: sql.type,
+        targetQuery: sqlAnalyzeResult,
         targetFunction: {
           ...sql.execution.executor,
           queryPositions: [sql.execution.position],
@@ -360,9 +461,13 @@ export const analyzeCPUCmd = async () => {
 
           for (const plan of plans) {
             let message = "";
-            switch (plan.plan) {
+            switch (plan.plan.type) {
               case "index":
-                message = `SQL ${result.query} is too slow. Please add index.`;
+                message = `SQL ${
+                  result.query
+                } is too slow. Please add index.(${JSON.stringify(
+                  plan.plan.issues
+                )})`;
                 break;
               case "join":
                 message = `SQL ${result.query} is too slow. Please join the table.`;

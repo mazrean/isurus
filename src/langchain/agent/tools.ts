@@ -1,7 +1,7 @@
 import { DynamicStructuredTool } from "@langchain/core/tools";
 
 import { z } from "zod";
-import { getLatestBenchmark } from "@/externals/benchmark";
+import { getLatestBenchmark } from "@/externals/isutools";
 import { formatTable } from "@/utils/format";
 
 const getPrometheusMetrics = async (url: string) => {

@@ -1,4 +1,4 @@
-import { getLatestBenchmark } from "@/externals/benchmark";
+import { getLatestBenchmark } from "@/externals/isutools";
 
 type Histogram = {
   count: number;

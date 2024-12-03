@@ -54,10 +54,10 @@
           "default": "http://localhost:9090",
           "description": "Prometheus URL."
         },
-        "isurus.benchmark.url": {
+        "isurus.isutools.url": {
           "type": "string",
-          "default": "http://localhost:6061/benchmark/latest",
-          "description": "Benchmark information URL."
+          "default": "http://localhost:6061",
+          "description": "isutools URL."
         },
         "isurus.app.name": {
           "type": "string",
