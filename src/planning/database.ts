@@ -1,12 +1,13 @@
 import * as vscode from "vscode";
 import { Prometheus } from "@/externals/prometheus";
-import { CRUDResponse, GoServer, Range } from "@/externals/go-server";
+import { CRUDResponse, GoServer } from "@/externals/go-server";
 import {
   explainQuery,
   getTableCreateQuery,
   QueryExplainResult,
 } from "@/externals/isutools";
 import { SqlPlan } from "@/model/plan";
+import { Range } from "@/model/code-position";
 
 const sqlCheckLimit = 5;
 
@@ -85,11 +86,6 @@ type CRUDGraphSummary = Map<
         position: Range;
         inLoop: boolean;
       };
-      metrics: {
-        duration: number;
-        latency: number;
-        executionCount: number;
-      };
     }[];
   }
 >;
@@ -139,11 +135,6 @@ const summarizeCRUDGraph = async (crud: CRUDResponse) => {
           executor,
           position: query.position,
           inLoop: query.inLoop,
-        },
-        metrics: {
-          duration: 0,
-          latency: 0,
-          executionCount: 0,
         },
       };
 
@@ -230,7 +221,7 @@ const generateFixPlan = async (
 
   for (const sql of sqlList) {
     const shouldCache =
-      sql.metrics.executionCount > 500 &&
+      sqlAnalyzeResult.executionCount > 500 &&
       sql.tableIds.every((id) =>
         crudSummary
           .get(id)

@@ -1,16 +1,6 @@
 import * as cp from "child_process";
 import * as rpc from "vscode-jsonrpc/node";
-
-type Position = {
-  line: number;
-  column: number;
-};
-
-export type Range = {
-  file: string;
-  start: Position;
-  end: Position;
-};
+import { Range } from "@/model/code-position";
 
 export type Query = {
   tableId: string;
@@ -52,11 +42,7 @@ export class GoServer {
       new rpc.StreamMessageReader(childProcess.stdout),
       new rpc.StreamMessageWriter(childProcess.stdin)
     );
-    childProcess.stderr.on("data", (data) => {
-      for (const line of data.toString().split("\n")) {
-        console.debug(line);
-      }
-    });
+    childProcess.stderr.on("data", () => {});
 
     this.connection.onError((error) => {
       console.error(error);

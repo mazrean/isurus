@@ -38,7 +38,7 @@ export type QueryExplainResult = {
 export const explainQuery = async (driver: string, query: string) => {
   const queriesRes = await fetch(`${config("isurus.isutools.url")}/queries`);
   if (!queriesRes.ok || queriesRes.status !== 200) {
-    console.info(
+    console.warn(
       `Failed to fetch queries(query: ${query}, status: ${
         queriesRes.status
       }): ${await queriesRes.text()}`
@@ -66,7 +66,7 @@ export const explainQuery = async (driver: string, query: string) => {
     `${config("isurus.isutools.url")}/queries/${queryId}/explain`
   );
   if (!res.ok || res.status !== 200) {
-    console.error(
+    console.warn(
       `Failed to explain query(query: ${query}, status: ${
         queriesRes.status
       }, id: ${queryId}): ${await res.text()}`
@@ -82,7 +82,7 @@ export const getTableCreateQuery = async (driver: string, table: string) => {
     `${config("isurus.isutools.url")}/tables?driver=${driver}`
   );
   if (!res.ok || res.status !== 200) {
-    console.error(
+    console.warn(
       `Failed to fetch table create query(table: ${table}, status: ${
         res.status
       }): ${await res.text()}`
