@@ -1,6 +1,11 @@
 import * as vscode from "vscode";
 import { SqlPlan } from "@/model/plan";
-import { addDiagnostic, updateDiagnostics } from "@/diagnostics";
+import {
+  addDiagnostic,
+  QuickFix,
+  QuickFixFunction,
+  updateDiagnostics,
+} from "@/diagnostics";
 import { analyze } from "@/planning/cpu";
 import { langchain } from "./langchain/openai-o1";
 
@@ -77,12 +82,38 @@ ${suggestion.createIndexQuery}`;
           break;
       }
 
+      let quickFixActionFunc: QuickFixFunction | undefined = undefined;
+      if (sqlPlan.plan.type !== "index") {
+        let quickFixCache: QuickFix | undefined = undefined;
+        quickFixActionFunc = async () => {
+          if (quickFixCache) {
+            return quickFixCache;
+          }
+
+          const suggestion = await langchain.generateSuggestion(sqlPlan);
+          if (suggestion.type !== "targetFunction") {
+            return;
+          }
+
+          const quickFix: QuickFix = {
+            title: "fix by isurus",
+            range: sqlPlan.targetFunction.position,
+            sourceCode: suggestion.targetFunction,
+          };
+
+          quickFixCache = quickFix;
+
+          return quickFix;
+        };
+      }
+
       for (const planPosition of getDiagnosticsPositions(sqlPlan)) {
         addDiagnostic(
           planPosition.file,
           planPosition,
           message,
-          vscode.DiagnosticSeverity.Warning
+          vscode.DiagnosticSeverity.Warning,
+          quickFixActionFunc
         );
       }
     }

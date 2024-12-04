@@ -1,11 +1,11 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
-import { Langchain } from "@/langchain/openai";
 import { config, registerCommand } from "@/config";
 import { goServer, startGoServer } from "./externals/go-server";
 import path from "path";
 import { analyzeCPUCmd } from "./analyzeCPU";
+import { CodeActionProvider, codeActionProvider } from "@/diagnostics";
 
 const helloWorldCmd = () => {
   vscode.window.showInformationMessage("Hello World from Isurus!");
@@ -41,8 +41,19 @@ export async function activate(context: vscode.ExtensionContext) {
     console.debug("Go server started");
   });
 
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      { scheme: "file", language: "go" },
+      codeActionProvider,
+      {
+        providedCodeActionKinds: CodeActionProvider.providedCodeActionKinds,
+      }
+    )
+  );
+
   registerCommand(context, "isurus.helloWorld", helloWorldCmd);
   registerCommand(context, "isurus.analyzeCPU", analyzeCPUCmd);
+
   console.debug('Congratulations, your extension "isurus" is now active!');
 }
 

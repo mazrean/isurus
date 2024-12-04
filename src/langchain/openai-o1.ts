@@ -1,4 +1,7 @@
-import { RunnableSequence } from "@langchain/core/runnables";
+import {
+  RunnablePassthrough,
+  RunnableSequence,
+} from "@langchain/core/runnables";
 import { ChatOpenAI } from "@langchain/openai";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
@@ -54,14 +57,15 @@ export class Langchain {
         prompt = await createUnknownPrompt(sqlFixPlan);
         break;
     }
-    const promptTemplate = PromptTemplate.fromTemplate(prompt);
 
     const chain = RunnableSequence.from([
-      promptTemplate,
+      PromptTemplate.fromTemplate("{prompt}"),
       this.openaiModel.bindTools([]),
       new StringOutputParser(),
     ]);
-    const response = await chain.invoke({});
+    const response = await chain.invoke({
+      prompt,
+    });
 
     switch (suggestionType) {
       case "index":
