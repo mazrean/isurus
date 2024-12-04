@@ -11,52 +11,7 @@ const helloWorldCmd = () => {
   vscode.window.showInformationMessage("Hello World from Isurus!");
 };
 
-const generateResponseCmd = () => {
-  const geminiToken = config("isurus.gemini.token");
-  if (!geminiToken) {
-    return () => {
-      vscode.window.showErrorMessage(
-        "Gemini API token is required.\nPlease set it and reload the window."
-      );
-    };
-  }
-
-  const openaiToken = config("isurus.openai.token");
-  if (!openaiToken) {
-    return () => {
-      vscode.window.showErrorMessage(
-        "OpenAI API token is required.\nPlease set it and reload the window."
-      );
-    };
-  }
-
-  const langchainToken = config("isurus.langchain.token");
-
-  const prometheusURL = config("isurus.prometheus.url");
-
-  let langchain = new Langchain({
-    openaiToken,
-    prometheusURL,
-    langchainToken,
-  });
-
-  return async () => {
-    const input = await vscode.window.showInputBox({
-      placeHolder: "Enter input",
-    });
-    if (!input) {
-      vscode.window.showErrorMessage("Input is required");
-      return;
-    }
-
-    const response = await langchain.generateResponse(input);
-    vscode.window.showInformationMessage(response);
-  };
-};
-
 export async function activate(context: vscode.ExtensionContext) {
-  console.log('Congratulations, your extension "isurus" is now active!');
-
   const files = await vscode.workspace.findFiles("**/go.mod");
   if (files.length === 0) {
     vscode.window.showErrorMessage(
@@ -83,12 +38,12 @@ export async function activate(context: vscode.ExtensionContext) {
       })
     );
 
-    console.log("Go server started");
+    console.debug("Go server started");
   });
 
   registerCommand(context, "isurus.helloWorld", helloWorldCmd);
-  registerCommand(context, "isurus.generateResponse", generateResponseCmd());
   registerCommand(context, "isurus.analyzeCPU", analyzeCPUCmd);
+  console.debug('Congratulations, your extension "isurus" is now active!');
 }
 
 export function deactivate() {}

@@ -1,16 +1,10 @@
 import * as vscode from "vscode";
 import { Range } from "@/model/code-position";
+import { convertRange } from "@/vscode";
 
 const collection = vscode.languages.createDiagnosticCollection("isurus");
 
 const diagnosticMap = new Map<string, vscode.Diagnostic[]>();
-
-const convertRange = (position: Range) => {
-  return new vscode.Range(
-    new vscode.Position(position.start.line - 1, position.start.column - 1),
-    new vscode.Position(position.end.line - 1, position.end.column - 1)
-  );
-};
 
 export const addDiagnostic = (
   fileName: string,

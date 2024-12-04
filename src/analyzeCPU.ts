@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { SqlPlan } from "@/model/plan";
 import { addDiagnostic, updateDiagnostics } from "@/diagnostics";
 import { analyze } from "@/planning/cpu";
+import { langchain } from "./langchain/openai-o1";
 
 const getDiagnosticsPositions = (plan: SqlPlan) => {
   return [
@@ -53,7 +54,14 @@ export const analyzeCPUCmd = async () => {
       let message = "";
       switch (sqlPlan.plan.type) {
         case "index":
-          message = `SQL ${sqlPlan.targetQuery.query} is too slow. Please add index.`;
+          const suggestion = await langchain.generateSuggestion(sqlPlan);
+          if (suggestion.type === "index") {
+            message = `SQL ${sqlPlan.targetQuery.query} is too slow. Please add index with below SQL.
+
+${suggestion.createIndexQuery}`;
+          } else {
+            message = `SQL ${sqlPlan.targetQuery.query} is too slow. Please add index.`;
+          }
           break;
         case "join":
           message = `SQL ${sqlPlan.targetQuery.query} is too slow. Please join the table.`;
